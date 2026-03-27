@@ -14,7 +14,13 @@
  * limitations under the License.
  */
 
-@file:OptIn(UnsafeDuringIrConstructionAPI::class, UnsafeDuringIrConstructionAPI::class)
+@file:OptIn(
+    org.jetbrains.kotlin.DeprecatedCompilerApi::class,
+    org.jetbrains.kotlin.DeprecatedForRemovalCompilerApi::class,
+    org.jetbrains.kotlin.fir.declarations.DirectDeclarationsAccess::class,
+    UnsafeDuringIrConstructionAPI::class,
+    UnsafeDuringIrConstructionAPI::class,
+)
 
 package io.realm.kotlin.compiler
 
@@ -48,6 +54,7 @@ import org.jetbrains.kotlin.fir.types.classId
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.builders.IrBlockBodyBuilder
 import org.jetbrains.kotlin.ir.builders.IrBlockBuilder
+import org.jetbrains.kotlin.ir.builders.IrGeneratorContext
 import org.jetbrains.kotlin.ir.builders.at
 import org.jetbrains.kotlin.ir.builders.declarations.IrFieldBuilder
 import org.jetbrains.kotlin.ir.builders.declarations.IrFunctionBuilder
@@ -58,10 +65,13 @@ import org.jetbrains.kotlin.ir.builders.declarations.addProperty
 import org.jetbrains.kotlin.ir.builders.declarations.addValueParameter
 import org.jetbrains.kotlin.ir.builders.declarations.buildField
 import org.jetbrains.kotlin.ir.builders.declarations.buildFun
+import org.jetbrains.kotlin.ir.builders.irCall
+import org.jetbrains.kotlin.ir.builders.irCallConstructor
 import org.jetbrains.kotlin.ir.builders.irBlockBody
 import org.jetbrains.kotlin.ir.builders.irGet
 import org.jetbrains.kotlin.ir.builders.irGetField
 import org.jetbrains.kotlin.ir.builders.irReturn
+import org.jetbrains.kotlin.ir.builders.irVararg
 import org.jetbrains.kotlin.ir.declarations.IrAnnotationContainer
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrDeclaration
@@ -74,6 +84,7 @@ import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.declarations.IrVariable
 import org.jetbrains.kotlin.ir.expressions.IrBlockBody
 import org.jetbrains.kotlin.ir.expressions.IrCall
+import org.jetbrains.kotlin.ir.expressions.IrConst
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrPropertyReference
 import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
@@ -98,6 +109,7 @@ import org.jetbrains.kotlin.ir.types.IrTypeArgument
 import org.jetbrains.kotlin.ir.types.getClass
 import org.jetbrains.kotlin.ir.types.impl.IrAbstractSimpleType
 import org.jetbrains.kotlin.ir.types.makeNullable
+import org.jetbrains.kotlin.ir.types.typeOrNull
 import org.jetbrains.kotlin.ir.types.typeWith
 import org.jetbrains.kotlin.ir.util.classId
 import org.jetbrains.kotlin.ir.util.companionObject
@@ -226,7 +238,7 @@ val FirClassSymbol<*>.isBaseRealmObject: Boolean
                             )
                 }
                 // After SUPERTYPES stage
-                is FirResolvedTypeRef -> typeRef.type.classId in realmObjectClassIds
+                is FirResolvedTypeRef -> typeRef.coneType.classId in realmObjectClassIds
                 else -> false
             }
         }
@@ -423,13 +435,74 @@ data class SchemaProperty(
 
     companion object {
         fun getPersistedName(declaration: IrProperty): String {
-            @Suppress("UNCHECKED_CAST")
-            return (declaration.getAnnotation(PERSISTED_NAME_ANNOTATION.asSingleFqName()).getValueArgument(0)!! as IrConstImpl<String>).value
+            return declaration
+                .getAnnotation(PERSISTED_NAME_ANNOTATION.asSingleFqName())
+                .getValueArgument(0)
+                .irConstStringValue()
         }
     }
 }
 
 // ------------------------------------------------------------------------------
+
+internal fun createIrCall(
+    context: IrGeneratorContext,
+    scopeOwner: IrSymbol,
+    startOffset: Int,
+    endOffset: Int,
+    type: IrType,
+    symbol: IrSimpleFunctionSymbol,
+    origin: IrStatementOrigin? = null
+): IrCallImpl {
+    return DeclarationIrBuilder(context, scopeOwner, startOffset, endOffset)
+        .irCall(symbol, type, symbol.owner.typeParameters.size, origin) as IrCallImpl
+}
+
+internal fun createIrConstructorCall(
+    context: IrGeneratorContext,
+    scopeOwner: IrSymbol,
+    startOffset: Int,
+    endOffset: Int,
+    type: IrType,
+    constructorSymbol: IrConstructorSymbol,
+    origin: IrStatementOrigin? = null
+): org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl {
+    val typeArguments = (type as? IrSimpleType)
+        ?.arguments
+        ?.mapNotNull { it.typeOrNull }
+        .orEmpty()
+    return if (origin == null) {
+        DeclarationIrBuilder(context, scopeOwner, startOffset, endOffset)
+            .irCallConstructor(constructorSymbol, typeArguments) as org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
+    } else {
+        org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl(
+            startOffset,
+            endOffset,
+            type,
+            constructorSymbol,
+            typeArguments.size,
+            constructorSymbol.owner.typeParameters.size,
+            origin
+        )
+    }
+}
+
+internal fun createIrVararg(
+    context: IrGeneratorContext,
+    scopeOwner: IrSymbol,
+    startOffset: Int,
+    endOffset: Int,
+    elementType: IrType,
+    elements: List<IrExpression>
+): IrVarargImpl {
+    return DeclarationIrBuilder(context, scopeOwner, startOffset, endOffset)
+        .irVararg(elementType, elements)
+}
+
+internal fun IrExpression?.irConstStringValue(): String {
+    return (this as? IrConst)?.value as? String
+        ?: error("Expected string constant but found ${this?.javaClass?.name}")
+}
 
 @Suppress("LongParameterList")
 internal fun <T : IrExpression> buildOf(
@@ -441,24 +514,24 @@ internal fun <T : IrExpression> buildOf(
     elementType: IrType,
     args: List<T>
 ): IrExpression {
-    return IrCallImpl(
-        startOffset = startOffset, endOffset = endOffset,
+    return createIrCall(
+        context = context,
+        scopeOwner = function,
+        startOffset = startOffset,
+        endOffset = endOffset,
         type = containerType.typeWith(elementType),
-        symbol = function,
-        typeArgumentsCount = 1,
-        valueArgumentsCount = 1,
-        origin = null,
-        superQualifierSymbol = null
+        symbol = function
     ).apply {
         putTypeArgument(index = 0, type = elementType)
         putValueArgument(
             index = 0,
-            valueArgument = IrVarargImpl(
-                UNDEFINED_OFFSET,
-                UNDEFINED_OFFSET,
-                context.irBuiltIns.arrayClass.typeWith(elementType),
-                type,
-                args.toList()
+            valueArgument = createIrVararg(
+                context = context,
+                scopeOwner = function,
+                startOffset = UNDEFINED_OFFSET,
+                endOffset = UNDEFINED_OFFSET,
+                elementType = elementType,
+                elements = args.toList()
             )
         )
     }
@@ -592,11 +665,13 @@ fun IrBlockBuilder.createSafeCallConstruction(
     return IrBlockImpl(startOffset, endOffset, resultType, IrStatementOrigin.SAFE_CALL).apply {
         statements += receiverVariable
         statements += IrWhenImpl(startOffset, endOffset, resultType).apply {
-            val condition = IrCallImpl(
-                startOffset, endOffset, context.irBuiltIns.booleanType,
-                context.irBuiltIns.eqeqSymbol,
-                valueArgumentsCount = 2,
-                typeArgumentsCount = 0,
+            val condition = createIrCall(
+                context = context,
+                scopeOwner = receiverVariableSymbol,
+                startOffset = startOffset,
+                endOffset = endOffset,
+                type = context.irBuiltIns.booleanType,
+                symbol = context.irBuiltIns.eqeqSymbol,
                 origin = IrStatementOrigin.EQEQ
             ).apply {
                 putValueArgument(0, IrGetValueImpl(startOffset, endOffset, receiverVariableSymbol))
@@ -683,8 +758,7 @@ fun getLinkingObjectPropertyName(backingField: IrField): String {
  */
 fun getSchemaClassName(clazz: IrClass): String {
     return if (clazz.hasAnnotation(PERSISTED_NAME_ANNOTATION)) {
-        @Suppress("UNCHECKED_CAST")
-        return (clazz.getAnnotation(PERSISTED_NAME_ANNOTATION.asSingleFqName()).getValueArgument(0)!! as IrConstImpl<String>).value
+        clazz.getAnnotation(PERSISTED_NAME_ANNOTATION.asSingleFqName()).getValueArgument(0).irConstStringValue()
     } else {
         clazz.name.identifier
     }

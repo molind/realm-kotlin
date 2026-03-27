@@ -261,11 +261,15 @@ class RealmCompilerSubplugin : KotlinCompilerPluginSupportPlugin, AnalyticsError
  * Wrapper to safely obtain provider for usage in configuration phases to support configuration
  * cache across Gradle versions.
  */
-private fun <T> Provider<T>.safeProvider(): Provider<T> = this.let {
+private fun <T : Any> Provider<T>.safeProvider(): Provider<T> = this.let {
     when {
         gradleVersion < gradle70 -> {
-            @Suppress("DEPRECATION")
-            it.forUseAtConfigurationTime()
+            @Suppress("UNCHECKED_CAST")
+            try {
+                Provider::class.java.getMethod("forUseAtConfigurationTime").invoke(it) as Provider<T>
+            } catch (_: ReflectiveOperationException) {
+                it
+            }
         }
         else -> it
     }
@@ -286,7 +290,7 @@ private fun gatherTargetInfo(kotlinCompilation: KotlinCompilation<*>): TargetInf
         }
 
         is KotlinJvmCompilation -> {
-            val jvmTarget = kotlinCompilation.kotlinOptions.jvmTarget
+            val jvmTarget = kotlinCompilation.compilerOptions.options.jvmTarget.orNull?.target
             TargetInfo("JVM", "Universal", jvmTarget, jvmTarget)
         }
 

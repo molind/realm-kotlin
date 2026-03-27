@@ -21,6 +21,7 @@ plugins {
 }
 
 val mavenPublicationName = "compilerPlugin"
+val releasedSdkVersion = "2.3.0"
 
 dependencies {
     kapt("org.jetbrains.kotlin:kotlin-compiler-embeddable:${Versions.kotlin}")
@@ -40,9 +41,9 @@ dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-reflect:${Versions.kotlin}")
     testImplementation("dev.zacsweers.kctfork:core:${Versions.kotlinCompileTesting}")
     // Have to be mentioned explicitly as it is not an api dependency of library
-    implementation(project(":cinterop"))
-    testImplementation(project(":library-base"))
-    testImplementation(project(":library-sync"))
+    implementation("io.realm.kotlin:cinterop:$releasedSdkVersion")
+    testImplementation("io.realm.kotlin:library-base:$releasedSdkVersion")
+    testImplementation("io.realm.kotlin:library-sync:$releasedSdkVersion")
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {

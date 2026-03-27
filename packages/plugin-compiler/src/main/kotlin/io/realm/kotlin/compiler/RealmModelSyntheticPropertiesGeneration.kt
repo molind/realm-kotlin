@@ -14,7 +14,11 @@
  * limitations under the License.
  */
 
-@file:OptIn(UnsafeDuringIrConstructionAPI::class)
+@file:OptIn(
+    UnsafeDuringIrConstructionAPI::class,
+    org.jetbrains.kotlin.DeprecatedCompilerApi::class,
+    org.jetbrains.kotlin.DeprecatedForRemovalCompilerApi::class,
+)
 
 package io.realm.kotlin.compiler
 
@@ -298,26 +302,26 @@ class RealmModelSyntheticPropertiesGeneration(private val pluginContext: IrPlugi
             REALM_OBJECT_COMPANION_FIELDS_MEMBER,
             companionFieldsType
         ) { startOffset, endOffset ->
-            IrCallImpl(
-                startOffset = startOffset, endOffset = endOffset,
+            createIrCall(
+                context = pluginContext,
+                scopeOwner = mapOf,
+                startOffset = startOffset,
+                endOffset = endOffset,
                 type = companionFieldsType,
-                symbol = mapOf,
-                typeArgumentsCount = 2,
-                valueArgumentsCount = 1,
-                origin = null,
-                superQualifierSymbol = null
+                symbol = mapOf
             ).apply {
                 putTypeArgument(index = 0, type = pluginContext.irBuiltIns.stringType)
                 putTypeArgument(index = 1, type = fieldTypeAndProperty)
                 putValueArgument(
                     index = 0,
-                    valueArgument = IrVarargImpl(
-                        UNDEFINED_OFFSET,
-                        UNDEFINED_OFFSET,
-                        pluginContext.irBuiltIns.arrayClass.typeWith(companionFieldsElementType),
-                        type,
+                    valueArgument = createIrVararg(
+                        context = pluginContext,
+                        scopeOwner = mapOf,
+                        startOffset = UNDEFINED_OFFSET,
+                        endOffset = UNDEFINED_OFFSET,
+                        elementType = companionFieldsElementType,
                         // Generate list of properties: List<Pair<String, Pair<KClass<*>, KMutableProperty1<*, *>>>>
-                        properties!!.entries.map {
+                        elements = properties!!.entries.map {
                             val property = it.value.declaration
                             val targetType: IrType = property.backingField!!.type
                             val propertyElementType: IrType = when (it.value.collectionType) {
@@ -337,7 +341,9 @@ class RealmModelSyntheticPropertiesGeneration(private val pluginContext: IrPlugi
                                 realmObjectMutablePropertyType
                             val elementType = pairClass.typeWith(pluginContext.irBuiltIns.kClassClass.typeWith(), objectPropertyType)
                             // Pair<String, Pair<String, KMutableProperty1<*, *>>>()
-                            IrConstructorCallImpl.fromSymbolOwner(
+                            createIrConstructorCall(
+                                context = pluginContext,
+                                scopeOwner = pairCtor,
                                 startOffset = startOffset,
                                 endOffset = endOffset,
                                 type = elementType,
@@ -356,7 +362,9 @@ class RealmModelSyntheticPropertiesGeneration(private val pluginContext: IrPlugi
                                 )
                                 putValueArgument(
                                     1,
-                                    IrConstructorCallImpl.fromSymbolOwner(
+                                    createIrConstructorCall(
+                                        context = pluginContext,
+                                        scopeOwner = pairCtor,
                                         startOffset = startOffset,
                                         endOffset = endOffset,
                                         type = elementType,
@@ -493,7 +501,9 @@ class RealmModelSyntheticPropertiesGeneration(private val pluginContext: IrPlugi
         function.dispatchReceiverParameter = companionObject.thisReceiver?.copyTo(function)
         function.body = pluginContext.blockBody(function.symbol) {
             +irReturn(
-                IrConstructorCallImpl.fromSymbolOwner(
+                createIrConstructorCall(
+                    context = pluginContext,
+                    scopeOwner = realmClassCtor,
                     startOffset = startOffset,
                     endOffset = endOffset,
                     type = realmClassImpl.defaultType,
@@ -501,13 +511,13 @@ class RealmModelSyntheticPropertiesGeneration(private val pluginContext: IrPlugi
                 ).apply {
                     putValueArgument(
                         0,
-                        IrCallImpl(
-                            startOffset,
-                            endOffset,
+                        createIrCall(
+                            context = pluginContext,
+                            scopeOwner = classInfoCreateMethod.symbol,
+                            startOffset = startOffset,
+                            endOffset = endOffset,
                             type = classInfoClass.defaultType,
-                            symbol = classInfoCreateMethod.symbol,
-                            typeArgumentsCount = 0,
-                            valueArgumentsCount = 5
+                            symbol = classInfoCreateMethod.symbol
                         ).apply {
                             dispatchReceiver = irGetObject(classInfoClass.companionObject()!!.symbol)
                             var arg = 0
@@ -714,20 +724,20 @@ class RealmModelSyntheticPropertiesGeneration(private val pluginContext: IrPlugi
                                 } ?: irNull(pluginContext.irBuiltIns.kClassClass.typeWith(typedRealmObjectInterface.defaultType).makeNullable())
 
                                 // Define the link target. Empty string if there is none.
-                                val linkPropertyName: IrConst<String> = if (type == linkingObjectType) {
+                                val linkPropertyName: IrConst = if (type == linkingObjectType) {
                                     val targetPropertyName = getLinkingObjectPropertyName(backingField)
                                     irString(targetPropertyName)
                                 } else {
                                     irString("")
                                 }
 
-                                IrCallImpl(
-                                    startOffset,
-                                    endOffset,
+                                createIrCall(
+                                    context = pluginContext,
+                                    scopeOwner = propertyCreateMethod,
+                                    startOffset = startOffset,
+                                    endOffset = endOffset,
                                     type = propertyClass.defaultType,
-                                    symbol = propertyCreateMethod,
-                                    typeArgumentsCount = 0,
-                                    valueArgumentsCount = 10
+                                    symbol = propertyCreateMethod
                                 ).apply {
                                     var arg = 0
                                     // Persisted name
@@ -783,7 +793,9 @@ class RealmModelSyntheticPropertiesGeneration(private val pluginContext: IrPlugi
                 ?: logError("Cannot find primary zero arg constructor", irClass.locationOf())
             if (firstZeroArgCtor is IrConstructor) {
                 +irReturn(
-                    IrConstructorCallImpl.fromSymbolOwner(
+                    createIrConstructorCall(
+                        context = pluginContext,
+                        scopeOwner = firstZeroArgCtor.symbol,
                         startOffset = startOffset,
                         endOffset = endOffset,
                         type = firstZeroArgCtor.returnType,

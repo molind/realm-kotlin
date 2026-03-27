@@ -14,7 +14,11 @@
  * limitations under the License.
  */
 
-@file:OptIn(UnsafeDuringIrConstructionAPI::class)
+@file:OptIn(
+    UnsafeDuringIrConstructionAPI::class,
+    org.jetbrains.kotlin.DeprecatedCompilerApi::class,
+    org.jetbrains.kotlin.DeprecatedForRemovalCompilerApi::class,
+)
 
 package io.realm.kotlin.compiler
 
@@ -134,15 +138,13 @@ private class SyncLowering(private val pluginContext: IrPluginContext, private v
     val transformer = object : IrElementTransformerVoid() {
         override fun visitCall(expression: IrCall): IrExpression {
             replacements[expression.symbol]?.let { (target, dispatchReceiverFunction) ->
-                return IrCallImpl(
+                return createIrCall(
+                    context = pluginContext,
+                    scopeOwner = target.symbol,
                     startOffset = expression.startOffset,
                     endOffset = expression.endOffset,
                     type = expression.type,
-                    symbol = target.symbol,
-                    typeArgumentsCount = 0,
-                    valueArgumentsCount = target.valueParameters.size,
-                    origin = null,
-                    superQualifierSymbol = null
+                    symbol = target.symbol
                 ).apply {
                     dispatchReceiver = dispatchReceiverFunction(expression)
                     val valueArguments = List(expression.valueArgumentsCount) { expression.getValueArgument(it) }

@@ -19,7 +19,6 @@ import java.io.FileInputStream
 plugins {
     kotlin("jvm")
     `java-gradle-plugin`
-    id("com.gradle.plugin-publish") version Versions.gradlePluginPublishPlugin
     id("realm-publisher")
 }
 
@@ -44,17 +43,7 @@ fun createMarkerArtifact(): Boolean {
     return value.toBoolean()
 }
 
-pluginBundle {
-    website = "https://github.com/realm/realm-kotlin"
-    vcsUrl = "https://github.com/realm/realm-kotlin"
-    tags = listOf("MongoDB", "Realm", "Database", "Kotlin", "Mobile", "Multiplatform", "Android", "KMM")
-
-    mavenCoordinates {
-        groupId = Realm.group
-        artifactId = Realm.gradlePluginId
-        version = Realm.version
-    }
-}
+val publishPluginMarker = createMarkerArtifact()
 
 gradlePlugin {
     plugins {
@@ -65,7 +54,7 @@ gradlePlugin {
                 "Realm is a mobile database: Build better apps faster."
             implementationClass = "io.realm.kotlin.gradle.RealmPlugin"
         }
-        isAutomatedPublishing = createMarkerArtifact()
+        isAutomatedPublishing = publishPluginMarker
     }
 }
 
@@ -78,9 +67,11 @@ realmPublish {
 
 publishing {
     publications {
-        register<MavenPublication>(mavenPublicationName) {
-            artifactId = Realm.gradlePluginId
-            from(components["java"])
+        if (!publishPluginMarker) {
+            register<MavenPublication>(mavenPublicationName) {
+                artifactId = Realm.gradlePluginId
+                from(components["java"])
+            }
         }
     }
 }
@@ -131,5 +122,5 @@ val versionConstants: Task = tasks.create("versionConstants") {
 tasks.getByName("compileKotlin").dependsOn(versionConstants)
 tasks.getByName("sourcesJar").dependsOn(versionConstants)
 afterEvaluate {
-    tasks.getByName("publishPluginJar").dependsOn(versionConstants)
+    tasks.findByName("publishPluginJar")?.dependsOn(versionConstants)
 }

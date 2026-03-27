@@ -14,7 +14,11 @@
  * limitations under the License.
  */
 
-@file:OptIn(UnsafeDuringIrConstructionAPI::class)
+@file:OptIn(
+    UnsafeDuringIrConstructionAPI::class,
+    org.jetbrains.kotlin.DeprecatedCompilerApi::class,
+    org.jetbrains.kotlin.DeprecatedForRemovalCompilerApi::class,
+)
 
 package io.realm.kotlin.compiler
 
@@ -118,7 +122,9 @@ private class RealmModelLowering(private val pluginContext: IrPluginContext) : C
             // able to resolve the companion object during runtime due to absence of
             // kotlin.reflect.full.companionObjectInstance
             if (pluginContext.platform.isNative()) {
-                val modelObjectAnnotation = IrConstructorCallImpl.fromSymbolOwner(
+                val modelObjectAnnotation = createIrConstructorCall(
+                    context = pluginContext,
+                    scopeOwner = modelObjectAnnotationClass.primaryConstructor!!.symbol,
                     startOffset = UNDEFINED_OFFSET,
                     endOffset = UNDEFINED_OFFSET,
                     type = modelObjectAnnotationClass.defaultType,

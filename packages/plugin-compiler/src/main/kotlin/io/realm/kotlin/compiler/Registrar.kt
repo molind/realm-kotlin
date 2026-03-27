@@ -19,11 +19,11 @@ package io.realm.kotlin.compiler
 import com.google.auto.service.AutoService
 import io.realm.kotlin.compiler.fir.model.RealmModelRegistrar
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
-import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.com.intellij.mock.MockProject
 import org.jetbrains.kotlin.com.intellij.openapi.extensions.LoadingOrder
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
+import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrarAdapter
 import org.jetbrains.kotlin.resolve.extensions.SyntheticResolveExtension
@@ -46,9 +46,12 @@ import org.jetbrains.kotlin.resolve.extensions.SyntheticResolveExtension
  * The [RealmObjectCompanion] holds static information about the schema (members, primary key, etc.)
  * and utility methods for constructing objects, etc.
  */
-@Suppress("deprecation")
+@Suppress("DEPRECATION_ERROR", "deprecation")
 @AutoService(org.jetbrains.kotlin.compiler.plugin.ComponentRegistrar::class)
-@OptIn(ExperimentalCompilerApi::class)
+@OptIn(
+    ExperimentalCompilerApi::class,
+    org.jetbrains.kotlin.DeprecatedForRemovalCompilerApi::class,
+)
 // TODO ComponentRegistrar is deprecated. Should be migrated to CompilerPluginRegistrar to support
 //  indicating whether plugin is k2-compatible, etc. See these issues for more context:
 //  - https://youtrack.jetbrains.com/issue/KT-52665/Deprecate-ComponentRegistrar
@@ -59,7 +62,7 @@ class Registrar : org.jetbrains.kotlin.compiler.plugin.ComponentRegistrar {
         configuration: CompilerConfiguration
     ) {
         messageCollector =
-            configuration.get(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, MessageCollector.NONE)
+            configuration.get(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY, MessageCollector.NONE)
         SchemaCollector.properties.clear()
 
         // We load our extensions LAST to avoid exposing our internal attributes to other plugins,

@@ -35,11 +35,15 @@ fun getPropertyValue(propertyName: String): String? {
     return systemValue
 }
 
-(getPropertyValue("includeSdkModules")?.let { it.toBoolean() } ?: true).let {
+(getPropertyValue("includeToolingModules")?.let { it.toBoolean() } ?: true).let {
     if (it) {
         include(":gradle-plugin")
         include(":plugin-compiler")
         include(":plugin-compiler-shaded")
+    }
+}
+(getPropertyValue("includeRuntimeModules")?.let { it.toBoolean() } ?: true).let {
+    if (it) {
         include(":library-base")
         include(":library-sync")
         include(":cinterop")

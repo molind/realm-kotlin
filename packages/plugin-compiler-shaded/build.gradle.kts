@@ -18,7 +18,7 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
 plugins {
     `java`
-    id("com.github.johnrengelman.shadow") version Versions.shadowJar
+    id("com.gradleup.shadow") version Versions.shadowJar
     id("realm-publisher")
 }
 
@@ -63,7 +63,7 @@ publishing {
     publications {
         register<MavenPublication>(mavenPublicationName) {
             artifactId = Realm.compilerPluginIdNative
-            project.shadow.component(this)
+            from(components["shadow"])
             artifact(tasks.named("sourcesJar"))
             artifact(tasks.named("javadocJar"))
         }

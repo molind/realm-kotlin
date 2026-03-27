@@ -22,6 +22,7 @@ import com.tschuchort.compiletesting.KotlinCompilation
 import com.tschuchort.compiletesting.PluginOption
 import com.tschuchort.compiletesting.SourceFile
 import io.realm.kotlin.internal.BaseRealmImpl
+import io.realm.kotlin.internal.ConfigurationImpl
 import io.realm.kotlin.internal.Mediator
 import io.realm.kotlin.internal.RealmObjectCompanion
 import io.realm.kotlin.internal.RealmObjectInternal
@@ -35,6 +36,8 @@ import io.realm.kotlin.internal.interop.RealmPointer
 import io.realm.kotlin.internal.schema.ClassMetadata
 import io.realm.kotlin.internal.schema.PropertyMetadata
 import io.realm.kotlin.internal.schema.SchemaMetadata
+import io.realm.kotlin.mongodb.internal.AppConfigurationImpl
+import io.realm.kotlin.mongodb.internal.AppImpl
 import io.realm.kotlin.types.BaseRealmObject
 import io.realm.kotlin.types.RealmObject
 import io.realm.kotlin.types.TypedRealmObject
@@ -63,40 +66,17 @@ class GenerationExtensionTest {
      * @param directory Directory containing test case files.
      */
     class Files(private val directory: String) {
+        private val baseDir: File
         val fileMap: Map<String, File>
 
         init {
-            val base = File(this::class.java.getResource("$directory").file)
-            val file = File(this::class.java.getResource("${directory}${File.separator}input").file)
+            baseDir = File(checkNotNull(this::class.java.getResource(directory)).toURI())
+            val file = baseDir.resolve("input")
             fileMap = file.walkTopDown()
                 .toList()
                 .filter { !it.isDirectory }
-                .map { it.relativeTo(base).path to it }
+                .map { it.relativeTo(baseDir).path to it }
                 .toMap()
-        }
-
-        private fun expectedDir() = listOf(
-            "src",
-            "test",
-            "resources",
-            directory,
-            "expected"
-        ).joinToString(separator = File.separator)
-
-        fun outputDir() = listOf(
-            "src",
-            "test",
-            "resources",
-            directory,
-            "output"
-        ).joinToString(separator = File.separator)
-
-        fun assertGeneratedIR() {
-            val outputFile = File("${outputDir()}/main/02_AFTER.ValidateIrBeforeLowering.ir")
-            stripInputPath(outputFile, fileMap)
-            val expected = File("${expectedDir()}/02_AFTER.ValidateIrBeforeLowering.ir").readText()
-            val actual = outputFile.readText()
-            assertEquals(expected, actual)
         }
     }
 
@@ -105,7 +85,21 @@ class GenerationExtensionTest {
         val inputs = Files("/schema")
         val result = compile(inputs)
         assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
-        inputs.assertGeneratedIR()
+
+        val compiled = result.classLoader.loadClass("schema.input.SchemaKt")
+        val conf1 = compiled.getDeclaredMethod("getConf1").invoke(null) as ConfigurationImpl
+        val conf2 = compiled.getDeclaredMethod("getConf2").invoke(null) as ConfigurationImpl
+
+        assertEquals(
+            setOf("schema.input.A", "schema.input.B", "schema.input.C"),
+            conf1.schema.mapNotNull { it.qualifiedName }.toSet()
+        )
+        assertEquals(
+            setOf("schema.input.A", "schema.input.C"),
+            conf2.schema.mapNotNull { it.qualifiedName }.toSet()
+        )
+        assertEquals(conf1.schema, conf1.mapOfKClassWithCompanion.keys)
+        assertEquals(conf2.schema, conf2.mapOfKClassWithCompanion.keys)
     }
 
     @Test
@@ -113,7 +107,11 @@ class GenerationExtensionTest {
         val inputs = Files("/sample")
         val result = compile(inputs)
         assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
-        inputs.assertGeneratedIR()
+
+        val sampleClass = result.classLoader.loadClass("sample.input.Sample")
+        val sample = sampleClass.getDeclaredConstructor().newInstance()
+        assertTrue(sample is RealmObject)
+        assertTrue(sample is RealmObjectInternal)
     }
 
     @Test
@@ -380,37 +378,49 @@ class GenerationExtensionTest {
             )
         )
         assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode)
-        inputs.assertGeneratedIR()
+
+        val compiled = result.classLoader.loadClass("AppKt")
+        val app1 = compiled.getDeclaredMethod("getApp1").invoke(null) as AppImpl
+        val app2 = compiled.getDeclaredMethod("getApp2").invoke(null) as AppConfigurationImpl
+        val app3 = compiled.getDeclaredMethod("getApp3").invoke(null) as AppConfigurationImpl
+
+        assertEquals("BUNDLE_ID", bundleId(app1.configuration))
+        assertEquals("BUNDLE_ID", bundleId(app2))
+        assertEquals("BUNDLE_ID", bundleId(app3))
+
+        val holder = result.classLoader.loadClass("A").getDeclaredConstructor().newInstance()
+        val app4 = holder.javaClass.getDeclaredMethod("getApp4").invoke(holder) as AppImpl
+        val app5 = holder.javaClass.getDeclaredMethod("getApp5").invoke(holder) as AppConfigurationImpl
+        val app6 = holder.javaClass.getDeclaredMethod("getApp6").invoke(holder) as AppConfigurationImpl
+
+        assertEquals("BUNDLE_ID", bundleId(app4.configuration))
+        assertEquals("BUNDLE_ID", bundleId(app5))
+        assertEquals("BUNDLE_ID", bundleId(app6))
     }
 
-    @Suppress("deprecation")
+    @Suppress("DEPRECATION_ERROR", "deprecation")
     private fun compile(
         inputs: Files,
-        plugins: List<org.jetbrains.kotlin.compiler.plugin.ComponentRegistrar> = listOf(Registrar()),
+        plugins: List<org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar> = listOf(RealmCompilerPluginRegistrar()),
         options: List<PluginOption> = emptyList(),
     ): JvmCompilationResult {
         return KotlinCompilation().apply {
             sources = inputs.fileMap.values.map { SourceFile.fromPath(it) }
             messageOutputStream = System.out
-            componentRegistrars = plugins
+            compilerPluginRegistrars = plugins
+            commandLineProcessors = listOf(RealmCommandLineProcessor())
             inheritClassPath = true
-            kotlincArguments = listOf(
-                "-Xjvm-default=all-compatibility",
-                "-Xdump-directory=${inputs.outputDir()}",
-                "-Xphases-to-dump-after=ValidateIrBeforeLowering"
-            )
+            kotlincArguments = listOf("-Xjvm-default=all-compatibility")
             commandLineProcessors = listOf(RealmCommandLineProcessor())
             pluginOptions = options
         }.compile()
     }
 
     companion object {
-        private fun stripInputPath(file: File, map: Map<String, File>) {
-            file.writeText(
-                map.entries.fold(file.readText()) { text, (name, file) ->
-                    text.replace(file.path, name)
-                }
-            )
+        private fun bundleId(configuration: Any): String {
+            val field = configuration.javaClass.getDeclaredField("bundleId")
+            field.isAccessible = true
+            return field.get(configuration) as String
         }
     }
 

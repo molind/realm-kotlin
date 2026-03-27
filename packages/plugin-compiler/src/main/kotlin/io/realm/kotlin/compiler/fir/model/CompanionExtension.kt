@@ -1,3 +1,5 @@
+@file:OptIn(org.jetbrains.kotlin.fir.symbols.SymbolInternals::class)
+
 /*
  * Copyright 2023 Realm Inc.
  *
@@ -20,7 +22,6 @@ import io.realm.kotlin.compiler.Names
 import io.realm.kotlin.compiler.fir.RealmPluginGeneratorKey
 import io.realm.kotlin.compiler.isBaseRealmObject
 import org.jetbrains.kotlin.fir.FirSession
-import org.jetbrains.kotlin.fir.analysis.checkers.getContainingClassSymbol
 import org.jetbrains.kotlin.fir.declarations.utils.isCompanion
 import org.jetbrains.kotlin.fir.extensions.FirDeclarationGenerationExtension
 import org.jetbrains.kotlin.fir.extensions.MemberGenerationContext
@@ -28,6 +29,7 @@ import org.jetbrains.kotlin.fir.extensions.NestedClassGenerationContext
 import org.jetbrains.kotlin.fir.plugin.createCompanionObject
 import org.jetbrains.kotlin.fir.plugin.createDefaultPrivateConstructor
 import org.jetbrains.kotlin.fir.plugin.createMemberFunction
+import org.jetbrains.kotlin.fir.resolve.providers.getRegularClassSymbolByClassId
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassLikeSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol
@@ -38,6 +40,11 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.SpecialNames
 
 class CompanionExtension(session: FirSession) : FirDeclarationGenerationExtension(session) {
+    private fun FirClassSymbol<*>.containingClassSymbol(): FirClassSymbol<*>? {
+        val outerClassId = classId.outerClassId ?: return null
+        return session.getRegularClassSymbolByClassId(outerClassId)
+    }
+
     override fun getNestedClassifiersNames(
         classSymbol: FirClassSymbol<*>,
         context: NestedClassGenerationContext
@@ -66,7 +73,7 @@ class CompanionExtension(session: FirSession) : FirDeclarationGenerationExtensio
         classSymbol: FirClassSymbol<*>,
         context: MemberGenerationContext
     ): Set<Name> {
-        if (classSymbol.isCompanion && (classSymbol.getContainingClassSymbol(session) as? FirClassSymbol<*>)?.isBaseRealmObject == true) {
+        if (classSymbol.isCompanion && classSymbol.containingClassSymbol()?.isBaseRealmObject == true) {
             return setOf(
                 Names.REALM_OBJECT_COMPANION_SCHEMA_METHOD,
                 Names.REALM_OBJECT_COMPANION_NEW_INSTANCE_METHOD,
@@ -88,7 +95,7 @@ class CompanionExtension(session: FirSession) : FirDeclarationGenerationExtensio
                         owner,
                         RealmPluginGeneratorKey,
                         callableId.callableName,
-                        session.builtinTypes.anyType.type,
+                        session.builtinTypes.anyType.coneType,
                     ).symbol
                 )
 
@@ -98,7 +105,7 @@ class CompanionExtension(session: FirSession) : FirDeclarationGenerationExtensio
                         owner,
                         RealmPluginGeneratorKey,
                         callableId.callableName,
-                        session.builtinTypes.anyType.type
+                        session.builtinTypes.anyType.coneType
                     ).symbol
                 )
 

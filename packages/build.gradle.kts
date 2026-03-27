@@ -184,8 +184,8 @@ tasks.register("uploadDokka") {
         // Upload two copies, to 'latest' and a versioned folder for posterity.
         // Symlinks would have been safer and faster, but this is not supported by S3.
         listOf(Realm.version, "latest").forEach { version: String ->
-            exec {
-                commandLine = listOf(
+            providers.exec {
+                commandLine(
                     "s3cmd",
                     "put",
                     "--no-mime-magic",
@@ -197,7 +197,7 @@ tasks.register("uploadDokka") {
                     "${dokkaDir.absolutePath}/", // Add / to only upload content of the folder, not the folder itself.
                     "s3://realm-sdks/docs/realm-sdks/kotlin/$version/"
                 )
-            }
+            }.result.get()
         }
     }
 }

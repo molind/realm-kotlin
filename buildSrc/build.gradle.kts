@@ -1,3 +1,8 @@
+import org.gradle.api.JavaVersion
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 /*
  * Copyright 2020 Realm Inc.
  *
@@ -17,11 +22,14 @@
 // Add support for precompiled script plugins: https://docs.gradle.org/current/userguide/custom_plugins.html#sec:precompiled_plugins
 plugins {
     `kotlin-dsl`
-    `kotlin-dsl-precompiled-script-plugins`
 }
 
 gradlePlugin {
     plugins {
+        register("realm-lint") {
+            id = "realm-lint"
+            implementationClass = "io.realm.kotlin.RealmLintPlugin"
+        }
         register("realm-publisher") {
             id = "realm-publisher"
             implementationClass = "io.realm.kotlin.RealmPublishPlugin"
@@ -30,8 +38,8 @@ gradlePlugin {
 }
 
 java {
-    sourceCompatibility = Versions.sourceCompatibilityVersion
-    targetCompatibility = Versions.targetCompatibilityVersion
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 repositories {
@@ -57,4 +65,14 @@ dependencies {
     implementation("com.android.tools:r8:${Versions.Android.r8}")
     implementation("com.android.tools.build:gradle:${Versions.Android.buildTools}")
     implementation(kotlin("script-runtime"))
+}
+
+afterEvaluate {
+    tasks.withType<KotlinCompile>().configureEach {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+            apiVersion.set(KotlinVersion.KOTLIN_2_3)
+            languageVersion.set(KotlinVersion.KOTLIN_2_3)
+        }
+    }
 }

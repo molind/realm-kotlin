@@ -14,7 +14,11 @@
  * limitations under the License.
  */
 
-@file:OptIn(UnsafeDuringIrConstructionAPI::class)
+@file:OptIn(
+    org.jetbrains.kotlin.DeprecatedCompilerApi::class,
+    org.jetbrains.kotlin.DeprecatedForRemovalCompilerApi::class,
+    UnsafeDuringIrConstructionAPI::class,
+)
 
 package io.realm.kotlin.compiler
 

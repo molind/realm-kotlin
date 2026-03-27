@@ -1,4 +1,8 @@
-@file:OptIn(UnsafeDuringIrConstructionAPI::class)
+@file:OptIn(
+    UnsafeDuringIrConstructionAPI::class,
+    org.jetbrains.kotlin.DeprecatedCompilerApi::class,
+    org.jetbrains.kotlin.DeprecatedForRemovalCompilerApi::class,
+)
 
 package io.realm.kotlin.compiler
 
@@ -70,13 +74,13 @@ class RealmModelDefaultMethodGeneration(private val pluginContext: IrPluginConte
         val function: IrSimpleFunction = irClass.symbol.owner.functions.single { it.name.toString() == "equals" }
         function.body = pluginContext.blockBody(function.symbol) {
             +irReturn(
-                IrCallImpl(
+                createIrCall(
+                    context = pluginContext,
+                    scopeOwner = function.symbol,
                     startOffset = startOffset,
                     endOffset = endOffset,
                     type = pluginContext.irBuiltIns.booleanType,
-                    symbol = realmEquals.symbol,
-                    typeArgumentsCount = 0,
-                    valueArgumentsCount = 2
+                    symbol = realmEquals.symbol
                 ).apply {
                     dispatchReceiver = irGetObject(realmObjectHelper.symbol)
                     putValueArgument(0, irGet(function.dispatchReceiverParameter!!.type, function.dispatchReceiverParameter!!.symbol))
@@ -90,13 +94,13 @@ class RealmModelDefaultMethodGeneration(private val pluginContext: IrPluginConte
         val function: IrSimpleFunction = irClass.symbol.owner.functions.single { it.name.toString() == "hashCode" }
         function.body = pluginContext.blockBody(function.symbol) {
             +irReturn(
-                IrCallImpl(
+                createIrCall(
+                    context = pluginContext,
+                    scopeOwner = function.symbol,
                     startOffset = startOffset,
                     endOffset = endOffset,
                     type = pluginContext.irBuiltIns.intType,
-                    symbol = realmHashCode.symbol,
-                    typeArgumentsCount = 0,
-                    valueArgumentsCount = 1
+                    symbol = realmHashCode.symbol
                 ).apply {
                     dispatchReceiver = irGetObject(realmObjectHelper.symbol)
                     putValueArgument(0, irGet(function.dispatchReceiverParameter!!.type, function.dispatchReceiverParameter!!.symbol))
@@ -109,13 +113,13 @@ class RealmModelDefaultMethodGeneration(private val pluginContext: IrPluginConte
         val function: IrSimpleFunction = irClass.symbol.owner.functions.single { it.name.toString() == "toString" }
         function.body = pluginContext.blockBody(function.symbol) {
             +irReturn(
-                IrCallImpl(
+                createIrCall(
+                    context = pluginContext,
+                    scopeOwner = function.symbol,
                     startOffset = startOffset,
                     endOffset = endOffset,
                     type = pluginContext.irBuiltIns.stringType,
-                    symbol = realmToString.symbol,
-                    typeArgumentsCount = 0,
-                    valueArgumentsCount = 1
+                    symbol = realmToString.symbol
                 ).apply {
                     dispatchReceiver = irGetObject(realmObjectHelper.symbol)
                     putValueArgument(0, irGet(function.dispatchReceiverParameter!!.type, function.dispatchReceiverParameter!!.symbol))
