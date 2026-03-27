@@ -86,6 +86,21 @@ class RealmPublishPlugin : Plugin<Project> {
         }
     }
 
+    private fun configureGlobusRepository(project: Project) {
+        project.extensions.getByType<PublishingExtension>().apply {
+            repositories {
+                maven {
+                    name = "Globus"
+                    url = project.uri("https://maven.globus.software/artifactory/libs")
+                    credentials {
+                        username = getPropertyValue(project, "GLOBUS_MAVEN_USER")
+                        password = getPropertyValue(project, "GLOBUS_MAVEN_PASS")
+                    }
+                }
+            }
+        }
+    }
+
     private fun configureSignedBuild(signBuild: Boolean, project: Project) {
         // The nexus publisher plugin can only be applied to top-level projects.
         // See https://github.com/gradle-nexus/publish-plugin/issues/81
@@ -97,6 +112,7 @@ class RealmPublishPlugin : Plugin<Project> {
         } else {
             configureSubProject(project, signBuild)
             configureTestRepository(project)
+            configureGlobusRepository(project)
         }
     }
 

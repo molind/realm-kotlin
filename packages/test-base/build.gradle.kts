@@ -111,6 +111,7 @@ kotlin {
 }
 
 // Android configuration
+@Suppress("DEPRECATION")
 android {
     namespace = "io.realm.testapp"
     compileSdk = Versions.Android.compileSdkVersion
@@ -118,7 +119,6 @@ android {
 
     defaultConfig {
         minSdk = Versions.Android.minSdk
-        targetSdk = Versions.Android.targetSdk
         multiDexEnabled = true
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

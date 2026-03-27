@@ -20,9 +20,12 @@ plugins {
     id("realm-publisher")
 }
 
+abstract class ExecOps @javax.inject.Inject constructor(val execOps: org.gradle.process.ExecOperations)
+val execOps = project.objects.newInstance(ExecOps::class).execOps
+
 val mavenPublicationName = "jniSwigStubs"
 
-val generatedSourceRoot = "$buildDir/generated/sources"
+val generatedSourceRoot = "${project.layout.buildDirectory.get().asFile}/generated/sources"
 
 java {
     withSourcesJar()
@@ -37,11 +40,11 @@ java {
     targetCompatibility = Versions.targetCompatibilityVersion
 }
 
-val realmWrapperJvm: Task = tasks.create("realmWrapperJvm") {
+val realmWrapperJvm = tasks.register("realmWrapperJvm") {
     doLast {
         // If task is actually triggered (not up to date) then we should clean up the old stuff
         delete(fileTree(generatedSourceRoot))
-        exec {
+        execOps.exec {
             workingDir(".")
             commandLine("swig", "-java", "-c++", "-package", "io.realm.kotlin.internal.interop", "-I$projectDir/../external/core/src", "-o", "$generatedSourceRoot/jni/realmc.cpp", "-outdir", "$generatedSourceRoot/java/io/realm/kotlin/internal/interop", "realm.i")
         }

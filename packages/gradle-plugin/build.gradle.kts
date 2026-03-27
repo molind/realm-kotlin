@@ -84,7 +84,7 @@ java {
 }
 
 // Make version information available at runtime
-val versionDirectory = "$buildDir/generated/source/version/"
+val versionDirectory = "${project.layout.buildDirectory.get().asFile}/generated/source/version/"
 sourceSets {
     main {
         java.srcDir(versionDirectory)
@@ -92,7 +92,7 @@ sourceSets {
 }
 
 // Task to generate gradle plugin runtime constants for SDK and core versions
-val versionConstants: Task = tasks.create("versionConstants") {
+val versionConstants = tasks.register("versionConstants") {
     val coreDependenciesFile = layout.projectDirectory.file(
         listOf("..", "external", "core", "dependencies.yml").joinToString(File.separator)
     )

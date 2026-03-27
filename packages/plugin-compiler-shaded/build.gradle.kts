@@ -31,7 +31,7 @@ val mavenPublicationName = "compilerPluginShaded"
 tasks {
     named<ShadowJar>("shadowJar") {
         archiveClassifier.set("")
-        this.destinationDirectory.set(file("$buildDir/libs"))
+        this.destinationDirectory.set(file("${project.layout.buildDirectory.get().asFile}/libs"))
     }
 }
 tasks {

@@ -141,6 +141,7 @@ tasks.withType<KotlinNativeCompile>().configureEach {
 }
 
 // Android configuration
+@Suppress("DEPRECATION")
 android {
     namespace = "io.realm.kotlin"
     compileSdk = Versions.Android.compileSdkVersion
@@ -148,7 +149,6 @@ android {
 
     defaultConfig {
         minSdk = Versions.Android.minSdk
-        targetSdk = Versions.Android.targetSdk
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         sourceSets {

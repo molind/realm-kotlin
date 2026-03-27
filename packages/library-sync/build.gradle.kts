@@ -131,6 +131,7 @@ tasks.withType<KotlinCompile>().configureEach {
 }
 
 // Android configuration
+@Suppress("DEPRECATION")
 android {
     namespace = "io.realm.kotlin.mongodb"
     compileSdk = Versions.Android.compileSdkVersion
@@ -138,7 +139,6 @@ android {
 
     defaultConfig {
         minSdk = Versions.Android.minSdk
-        targetSdk = Versions.Android.targetSdk
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         sourceSets {
