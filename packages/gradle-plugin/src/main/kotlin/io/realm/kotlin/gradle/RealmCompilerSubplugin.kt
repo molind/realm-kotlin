@@ -16,7 +16,6 @@
 
 package io.realm.kotlin.gradle
 
-import com.android.build.gradle.BaseExtension
 import io.realm.kotlin.gradle.analytics.AnalyticsErrorCatcher
 import io.realm.kotlin.gradle.analytics.AnalyticsService
 import io.realm.kotlin.gradle.analytics.AnalyticsService.Companion.UNKNOWN
@@ -283,15 +282,7 @@ private fun gatherTargetInfo(kotlinCompilation: KotlinCompilation<*>): TargetInf
             null
 
         is KotlinJvmAndroidCompilation -> {
-            val androidExtension =
-                project.extensions.findByName("android") as BaseExtension?
-            val defaultConfig = androidExtension?.defaultConfig
-            val minSDK = defaultConfig?.minSdkVersion?.apiString
-            val targetSDK = defaultConfig?.targetSdkVersion?.apiString
-            val targetCpuArch: String =
-                defaultConfig?.ndk?.abiFilters?.singleOrNull()?.let { androidArch(it) }
-                    ?: "Universal"
-            TargetInfo("Android", targetCpuArch, targetSDK, minSDK)
+            extractAndroidTargetInfo(project.extensions.findByName("android"))
         }
 
         is KotlinJvmCompilation -> {
