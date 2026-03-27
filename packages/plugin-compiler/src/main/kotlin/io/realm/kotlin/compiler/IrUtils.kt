@@ -15,10 +15,7 @@
  */
 
 @file:OptIn(
-    org.jetbrains.kotlin.DeprecatedCompilerApi::class,
-    org.jetbrains.kotlin.DeprecatedForRemovalCompilerApi::class,
     org.jetbrains.kotlin.fir.declarations.DirectDeclarationsAccess::class,
-    UnsafeDuringIrConstructionAPI::class,
     UnsafeDuringIrConstructionAPI::class,
 )
 
@@ -78,6 +75,8 @@ import org.jetbrains.kotlin.ir.declarations.IrDeclaration
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationWithName
 import org.jetbrains.kotlin.ir.declarations.IrField
+import org.jetbrains.kotlin.ir.declarations.IrFunction
+import org.jetbrains.kotlin.ir.declarations.IrValueParameter
 import org.jetbrains.kotlin.ir.declarations.IrMutableAnnotationContainer
 import org.jetbrains.kotlin.ir.declarations.IrProperty
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
@@ -131,8 +130,53 @@ import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes
 import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes.SUPER_TYPE_LIST
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.types.KotlinType
+import org.jetbrains.kotlin.ir.declarations.IrParameterKind
+import org.jetbrains.kotlin.ir.expressions.IrMemberAccessExpression
 import java.lang.reflect.Field
 import java.util.function.Predicate
+
+// --- Migration helpers for deprecated compiler APIs (unified parameter/argument model) ---
+
+/** Replaces deprecated IrFunction.valueParameters — returns only Regular parameters. */
+internal val IrFunction.regularParameters: List<IrValueParameter>
+    get() = parameters.filter { it.kind == IrParameterKind.Regular }
+
+/** Replaces deprecated IrFunction.dispatchReceiverParameter (read). */
+internal val IrFunction.dispatchParameter: IrValueParameter?
+    get() = parameters.firstOrNull { it.kind == IrParameterKind.DispatchReceiver }
+
+/** Replaces deprecated putValueArgument(index, value) — indexes by regular parameter position. */
+internal fun IrMemberAccessExpression<*>.setRegularArgument(index: Int, value: IrExpression?) {
+    val callee = when (val s = symbol) {
+        is IrSimpleFunctionSymbol -> s.owner
+        is IrConstructorSymbol -> s.owner
+        else -> error("Unsupported symbol type: $s")
+    }
+    val param = callee.regularParameters[index]
+    arguments[param] = value
+}
+
+/** Replaces deprecated getValueArgument(index) — indexes by regular parameter position. */
+internal fun IrMemberAccessExpression<*>.getRegularArgument(index: Int): IrExpression? {
+    val callee = when (val s = symbol) {
+        is IrSimpleFunctionSymbol -> s.owner
+        is IrConstructorSymbol -> s.owner
+        else -> error("Unsupported symbol type: $s")
+    }
+    val param = callee.regularParameters[index]
+    return arguments[param]
+}
+
+/** Replaces deprecated write to IrFunction.dispatchReceiverParameter. */
+internal fun IrFunction.setDispatchReceiver(param: IrValueParameter?) {
+    if (param == null) {
+        parameters = parameters.filter { it.kind != IrParameterKind.DispatchReceiver }
+    } else {
+        param.kind = IrParameterKind.DispatchReceiver
+        val withoutOld = parameters.filter { it.kind != IrParameterKind.DispatchReceiver }
+        parameters = listOf(param) + withoutOld
+    }
+}
 
 // Somehow addSetter was removed from the IrProperty in https://github.com/JetBrains/kotlin/commit/d1dc938a5d7331ba43fcbb8ce53c3e17ef76a22a#diff-2726c3747ace0a1c93ad82365cf3ff18L114
 // Remove this extension when this will be re-introduced? see https://kotlinlang.slack.com/archives/C7L3JB43G/p1600888883006300
@@ -437,7 +481,7 @@ data class SchemaProperty(
         fun getPersistedName(declaration: IrProperty): String {
             return declaration
                 .getAnnotation(PERSISTED_NAME_ANNOTATION.asSingleFqName())
-                .getValueArgument(0)
+                .getRegularArgument(0)
                 .irConstStringValue()
         }
     }
@@ -522,10 +566,10 @@ internal fun <T : IrExpression> buildOf(
         type = containerType.typeWith(elementType),
         symbol = function
     ).apply {
-        putTypeArgument(index = 0, type = elementType)
-        putValueArgument(
-            index = 0,
-            valueArgument = createIrVararg(
+        typeArguments[0] = elementType
+        setRegularArgument(
+            0,
+            createIrVararg(
                 context = context,
                 scopeOwner = function,
                 startOffset = UNDEFINED_OFFSET,
@@ -546,7 +590,7 @@ internal fun <T : IrExpression> buildSetOf(
 ): IrExpression {
     val setOf = context.referenceFunctions(CallableId(FqName("kotlin.collections"), Name.identifier("setOf")))
         .first {
-            val parameters = it.owner.valueParameters
+            val parameters = it.owner.regularParameters
             parameters.size == 1 && parameters.first().isVararg
         }
     val setIrClass: IrClass = context.lookupClassOrThrow(ClassIds.KOTLIN_COLLECTIONS_SET)
@@ -562,7 +606,7 @@ internal fun <T : IrExpression> buildListOf(
 ): IrExpression {
     val listOf = context.referenceFunctions(KOTLIN_COLLECTIONS_LISTOF)
         .first {
-            val parameters = it.owner.valueParameters
+            val parameters = it.owner.regularParameters
             parameters.size == 1 && parameters.first().isVararg
         }
     val listIrClass: IrClass = context.lookupClassOrThrow(ClassIds.KOTLIN_COLLECTIONS_LIST)
@@ -604,7 +648,7 @@ fun IrClass.addValueProperty(
         returnType = propertyType
     }
     // $this: VALUE_PARAMETER name:<this> type:dev.nhachicha.Foo.$RealmHandler
-    getter.dispatchReceiverParameter = thisReceiver!!.copyTo(getter)
+    getter.setDispatchReceiver(thisReceiver!!.copyTo(getter))
     // overridden:
     //   public abstract fun <get-realmPointer> (): kotlin.Long? declared in dev.nhachicha.RealmObjectInternal
     val propertyAccessorGetter = superClass.getPropertyGetter(propertyName.asString())
@@ -619,7 +663,7 @@ fun IrClass.addValueProperty(
         at(startOffset, endOffset)
         +irReturn(
             irGetField(
-                irGet(getter.dispatchReceiverParameter!!),
+                irGet(getter.dispatchParameter!!),
                 property.backingField!!,
                 property.backingField!!.type
             )
@@ -642,12 +686,11 @@ internal fun IrClass.addFakeOverrides(
             origin = IrDeclarationOrigin.FAKE_OVERRIDE
             isFakeOverride = true
         }.apply {
-            override.valueParameters.forEach { x ->
+            override.regularParameters.forEach { x ->
                 addValueParameter(x.name, x.type)
             }
             this.overriddenSymbols = listOf(override.symbol)
-            dispatchReceiverParameter =
-                receiver.owner.thisReceiver!!.copyTo(this)
+            setDispatchReceiver(receiver.owner.thisReceiver!!.copyTo(this))
         }
     }
 }
@@ -674,8 +717,8 @@ fun IrBlockBuilder.createSafeCallConstruction(
                 symbol = context.irBuiltIns.eqeqSymbol,
                 origin = IrStatementOrigin.EQEQ
             ).apply {
-                putValueArgument(0, IrGetValueImpl(startOffset, endOffset, receiverVariableSymbol))
-                putValueArgument(
+                setRegularArgument(0, IrGetValueImpl(startOffset, endOffset, receiverVariableSymbol))
+                setRegularArgument(
                     1,
                     IrConstImpl.constNull(startOffset, endOffset, context.irBuiltIns.nothingNType)
                 )
@@ -715,7 +758,7 @@ fun getCollectionElementType(backingFieldType: IrType): IrType? {
 
 fun getBacklinksTargetType(backingField: IrField): IrType {
     (backingField.initializer!!.expression as IrCall).let { irCall ->
-        val propertyReference = irCall.getValueArgument(0) as IrPropertyReference
+        val propertyReference = irCall.getRegularArgument(0) as IrPropertyReference
         val propertyType = (propertyReference.type as IrAbstractSimpleType)
         return propertyType.arguments[0] as IrType
     }
@@ -725,7 +768,7 @@ fun getBacklinksTargetPropertyType(declaration: IrProperty): IrType? {
     val backingField: IrField = declaration.backingField!!
 
     (backingField.initializer!!.expression as IrCall).let { irCall ->
-        val targetPropertyParameter = irCall.getValueArgument(0)
+        val targetPropertyParameter = irCall.getRegularArgument(0)
 
         // Limit linkingObjects to accept only initialization parameters
         if (targetPropertyParameter is IrPropertyReference) {
@@ -743,7 +786,7 @@ fun getBacklinksTargetPropertyType(declaration: IrProperty): IrType? {
 
 fun getLinkingObjectPropertyName(backingField: IrField): String {
     (backingField.initializer!!.expression as IrCall).let { irCall ->
-        val propertyReference = irCall.getValueArgument(0) as IrPropertyReference
+        val propertyReference = irCall.getRegularArgument(0) as IrPropertyReference
         val targetProperty: IrProperty = propertyReference.symbol.owner
         return if (targetProperty.hasAnnotation(PERSISTED_NAME_ANNOTATION)) {
             SchemaProperty.getPersistedName(targetProperty)
@@ -758,7 +801,7 @@ fun getLinkingObjectPropertyName(backingField: IrField): String {
  */
 fun getSchemaClassName(clazz: IrClass): String {
     return if (clazz.hasAnnotation(PERSISTED_NAME_ANNOTATION)) {
-        clazz.getAnnotation(PERSISTED_NAME_ANNOTATION.asSingleFqName()).getValueArgument(0).irConstStringValue()
+        clazz.getAnnotation(PERSISTED_NAME_ANNOTATION.asSingleFqName()).getRegularArgument(0).irConstStringValue()
     } else {
         clazz.name.identifier
     }

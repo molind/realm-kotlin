@@ -16,6 +16,7 @@
 
 package io.realm.kotlin.compiler
 
+import com.google.auto.service.AutoService
 import io.realm.kotlin.compiler.fir.model.RealmModelRegistrar
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
@@ -26,6 +27,7 @@ import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrarAdapter
 import org.jetbrains.kotlin.resolve.extensions.SyntheticResolveExtension
 
+@AutoService(CompilerPluginRegistrar::class)
 @OptIn(ExperimentalCompilerApi::class)
 class RealmCompilerPluginRegistrar : CompilerPluginRegistrar() {
     override val pluginId: String = "io.realm.kotlin"

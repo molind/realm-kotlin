@@ -1,7 +1,5 @@
 @file:OptIn(
     UnsafeDuringIrConstructionAPI::class,
-    org.jetbrains.kotlin.DeprecatedCompilerApi::class,
-    org.jetbrains.kotlin.DeprecatedForRemovalCompilerApi::class,
 )
 
 package io.realm.kotlin.compiler
@@ -83,8 +81,8 @@ class RealmModelDefaultMethodGeneration(private val pluginContext: IrPluginConte
                     symbol = realmEquals.symbol
                 ).apply {
                     dispatchReceiver = irGetObject(realmObjectHelper.symbol)
-                    putValueArgument(0, irGet(function.dispatchReceiverParameter!!.type, function.dispatchReceiverParameter!!.symbol))
-                    putValueArgument(1, irGet(function.valueParameters[0].type, function.valueParameters[0].symbol))
+                    setRegularArgument(0, irGet(function.dispatchParameter!!.type, function.dispatchParameter!!.symbol))
+                    setRegularArgument(1, irGet(function.regularParameters[0].type, function.regularParameters[0].symbol))
                 }
             )
         }
@@ -103,7 +101,7 @@ class RealmModelDefaultMethodGeneration(private val pluginContext: IrPluginConte
                     symbol = realmHashCode.symbol
                 ).apply {
                     dispatchReceiver = irGetObject(realmObjectHelper.symbol)
-                    putValueArgument(0, irGet(function.dispatchReceiverParameter!!.type, function.dispatchReceiverParameter!!.symbol))
+                    setRegularArgument(0, irGet(function.dispatchParameter!!.type, function.dispatchParameter!!.symbol))
                 }
             )
         }
@@ -122,7 +120,7 @@ class RealmModelDefaultMethodGeneration(private val pluginContext: IrPluginConte
                     symbol = realmToString.symbol
                 ).apply {
                     dispatchReceiver = irGetObject(realmObjectHelper.symbol)
-                    putValueArgument(0, irGet(function.dispatchReceiverParameter!!.type, function.dispatchReceiverParameter!!.symbol))
+                    setRegularArgument(0, irGet(function.dispatchParameter!!.type, function.dispatchParameter!!.symbol))
                 }
             )
         }

@@ -16,8 +16,6 @@
 
 @file:OptIn(
     UnsafeDuringIrConstructionAPI::class,
-    org.jetbrains.kotlin.DeprecatedCompilerApi::class,
-    org.jetbrains.kotlin.DeprecatedForRemovalCompilerApi::class,
 )
 
 package io.realm.kotlin.compiler
@@ -130,7 +128,7 @@ private class RealmModelLowering(private val pluginContext: IrPluginContext) : C
                     type = modelObjectAnnotationClass.defaultType,
                     constructorSymbol = modelObjectAnnotationClass.primaryConstructor!!.symbol
                 ).apply {
-                    putValueArgument(
+                    setRegularArgument(
                         0,
                         IrClassReferenceImpl(
                             startOffset, endOffset,

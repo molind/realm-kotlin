@@ -34,7 +34,7 @@ fun getPropertyValue(propertyName: String, throwIfNotFound: Boolean = false): St
 }
 
 // Cache dir for build artifacts that should be stored on S3
-val releaseMetaDataDir = File("${buildDir}/outputs/s3")
+val releaseMetaDataDir = File("${layout.buildDirectory.get().asFile}/outputs/s3")
 releaseMetaDataDir.mkdirs()
 
 fun readAndCacheVersion(): String {
@@ -50,7 +50,7 @@ fun readAndCacheVersion(): String {
 val currentVersion = readAndCacheVersion()
 val subprojects = listOf("packages", "examples/kmm-sample", "benchmarks")
 fun taskName(subdir: String): String {
-    return subdir.split("/", "-").map { it.capitalize() }.joinToString(separator = "")
+    return subdir.split("/", "-").map { it.replaceFirstChar { c -> c.uppercase() } }.joinToString(separator = "")
 }
 
 fun copyProperties(action: GradleBuild) {
@@ -105,15 +105,15 @@ tasks {
     register<GradleBuild>("mavenCentralUpload") {
         description = "Push all Realm artifacts to Maven Central"
         group = "Publishing"
-        buildFile = file("${rootDir}/packages/build.gradle.kts")
+        dir = file("${rootDir}/packages")
         tasks = listOf("publishToSonatype")
         copyProperties(this)
     }
 
     // TODO Verify we can actually use these debug symbols
     val archiveDebugSymbols by register("archiveDebugSymbols", Zip::class) {
-        archiveName = "realm-kotlin-jni-libs-unstripped-${currentVersion}.zip"
-        destinationDir = releaseMetaDataDir
+        archiveFileName.set("realm-kotlin-jni-libs-unstripped-${currentVersion}.zip")
+        destinationDirectory.set(releaseMetaDataDir)
         from("${rootDir}/packages/cinterop/build/intermediates/merged_native_libs/release/out/lib") {
             include("**/*.so")
         }
@@ -143,7 +143,7 @@ tasks {
             exec {
                 val s3AccessKey = getPropertyValue("REALM_S3_ACCESS_KEY")
                 val s3SecretKey = getPropertyValue("REALM_S3_SECRET_KEY")
-                workingDir = File("${buildDir}/outputs/s3/")
+                workingDir = File("${layout.buildDirectory.get().asFile}/outputs/s3/")
                 commandLine = listOf(
                         "s3cmd",
                         "--access_key=${s3AccessKey}",
@@ -160,13 +160,13 @@ tasks {
         dependsOn.add(verifyS3Access)
         val s3AccessKey = getPropertyValue("REALM_S3_ACCESS_KEY")
         val s3SecretKey = getPropertyValue("REALM_S3_SECRET_KEY")
-        File("$buildDir/outputs/s3", "version.txt").writeText(currentVersion)
+        File("${layout.buildDirectory.get().asFile}/outputs/s3", "version.txt").writeText(currentVersion)
         commandLine = listOf(
                 "s3cmd",
                 "--access_key=${s3AccessKey}",
                 "--secret_key=${s3SecretKey}",
                 "put",
-                "${buildDir}/outputs/s3/version.txt",
+                "${layout.buildDirectory.get().asFile}/outputs/s3/version.txt",
                 "s3://static.realm.io/update/kotlin")
     }
 
