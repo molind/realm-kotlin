@@ -33,7 +33,6 @@ import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
 import org.jetbrains.kotlin.ir.expressions.impl.IrClassReferenceImpl
-import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
 import org.jetbrains.kotlin.ir.types.defaultType
@@ -120,12 +119,11 @@ private class RealmModelLowering(private val pluginContext: IrPluginContext) : C
             // able to resolve the companion object during runtime due to absence of
             // kotlin.reflect.full.companionObjectInstance
             if (pluginContext.platform.isNative()) {
-                val modelObjectAnnotation = createIrConstructorCall(
+                val modelObjectAnnotation = createIrAnnotation(
                     context = pluginContext,
                     scopeOwner = modelObjectAnnotationClass.primaryConstructor!!.symbol,
                     startOffset = UNDEFINED_OFFSET,
                     endOffset = UNDEFINED_OFFSET,
-                    type = modelObjectAnnotationClass.defaultType,
                     constructorSymbol = modelObjectAnnotationClass.primaryConstructor!!.symbol
                 ).apply {
                     setRegularArgument(

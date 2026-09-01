@@ -64,6 +64,7 @@ import org.jetbrains.kotlin.ir.builders.declarations.buildField
 import org.jetbrains.kotlin.ir.builders.declarations.buildFun
 import org.jetbrains.kotlin.ir.builders.irCall
 import org.jetbrains.kotlin.ir.builders.irCallConstructor
+import org.jetbrains.kotlin.ir.builders.irAnnotation
 import org.jetbrains.kotlin.ir.builders.irBlockBody
 import org.jetbrains.kotlin.ir.builders.irGet
 import org.jetbrains.kotlin.ir.builders.irGetField
@@ -82,6 +83,7 @@ import org.jetbrains.kotlin.ir.declarations.IrProperty
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.declarations.IrVariable
 import org.jetbrains.kotlin.ir.expressions.IrBlockBody
+import org.jetbrains.kotlin.ir.expressions.IrAnnotation
 import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrConst
 import org.jetbrains.kotlin.ir.expressions.IrExpression
@@ -529,6 +531,17 @@ internal fun createIrConstructorCall(
             origin
         )
     }
+}
+
+internal fun createIrAnnotation(
+    context: IrGeneratorContext,
+    scopeOwner: IrSymbol,
+    startOffset: Int,
+    endOffset: Int,
+    constructorSymbol: IrConstructorSymbol
+): IrAnnotation {
+    return DeclarationIrBuilder(context, scopeOwner, startOffset, endOffset)
+        .irAnnotation(constructorSymbol)
 }
 
 internal fun createIrVararg(

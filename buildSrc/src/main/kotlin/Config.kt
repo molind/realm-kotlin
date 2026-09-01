@@ -62,7 +62,7 @@ val HOST_OS: OperatingSystem = findHostOs()
 
 object Realm {
     val ciBuild = (System.getenv("CI") != null)
-    const val version = "2.3.0-globus.2"
+    const val version = "2.3.0-globus.3"
     const val group = "io.realm.kotlin"
     const val projectUrl = "https://realm.io"
     const val pluginPortalId = "io.realm.kotlin"
@@ -123,10 +123,10 @@ object Versions {
     const val junit = "4.13.2" // https://mvnrepository.com/artifact/junit/junit
     const val kbson = "0.4.0" // https://github.com/mongodb/kbson
     // When updating the Kotlin version, also remember to update /examples/min-android-sample/build.gradle.kts
-    const val kotlin = "2.3.20" // https://github.com/JetBrains/kotlin and https://kotlinlang.org/docs/releases.html#release-details
+    const val kotlin = "2.4.10" // https://github.com/JetBrains/kotlin and https://kotlinlang.org/docs/releases.html#release-details
     const val kotlinJvmTarget = "1.8" // Which JVM bytecode version is kotlin compiled to.
-    const val latestKotlin = "2.3.20" // https://kotlinlang.org/docs/eap.html#build-details
-    const val kotlinCompileTesting = "0.12.1" // https://github.com/zacsweers/kotlin-compile-testing
+    const val latestKotlin = "2.4.10" // https://kotlinlang.org/docs/eap.html#build-details
+    const val kotlinCompileTesting = "0.13.0" // https://github.com/zacsweers/kotlin-compile-testing
     const val ktlint = "0.45.2" // https://github.com/pinterest/ktlint
     const val ktor = "2.3.12" // https://github.com/ktorio/ktor
     const val multidex = "2.0.1" // https://developer.android.com/jetpack/androidx/releases/multidex
